@@ -466,7 +466,7 @@ $$
    - **Usage Note:** Querying a Metric View directly requires the `MEASURE()` function to explicitly invoke aggregation logic:
      ```sql
      SELECT MEASURE(`Total Revenue`) FROM retail_q.retail_semantic.retail_metrics;
-
+     ```
 
 ## 🎯 Key Architecture Decisions
 
