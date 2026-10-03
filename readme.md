@@ -414,13 +414,15 @@ LEFT JOIN retail_q.gold.dim_calendar cal
 The Gold layer completes the **Bronze → Silver → Gold** pipeline. The DLT pipeline graph should show the following dependencies:
 
 ```text
-Bronze (Raw)                   Silver (Cleaned)                 Gold (Business-Ready)
-─────────────                  ─────────────────                ─────────────────────
-salesforce_acc          →      silver.account            →      gold.dim_customer
-product_catalog (PG)    →      silver.product_catalog    →      gold.dim_product
-blob_transactions       →      silver.transactions       ┐
-salesforce_oppo         →      silver.opportunity        ┴→     gold.fact_sales
-                                                          └→     gold.dim_calendar (generated)
+Bronze (Raw)                        Silver (Cleaned)                   Gold (Business-Ready)
+─────────────────                   ─────────────────                  ────────────────────────
+salesforce_acc              ──►     silver.account              ──►    gold.dim_customer
+product_catalog (PG)        ──►     silver.product_catalog      ──►    gold.dim_product
+                                    
+blob_transactions           ──►     silver.transactions         ──┐
+salesforce_oppo             ──►     silver.opportunity          ──┴─►  gold.fact_sales
+                                    
+(generated)                 ──►     ─────────────────────────   ──►    gold.dim_calendar
 ```
 
 ## 🎯 Key Architecture Decisions
