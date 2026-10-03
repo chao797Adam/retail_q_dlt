@@ -254,8 +254,6 @@ def product_catalog_quarantine():
 - **Data Observability:** You can always answer the question "What happened to the dropped records?"
 - **Pipeline Resilience:** A single bad record does not block the entire pipeline, but it is also not silently ignored.
 - **Upstream Accountability:** Quarantine tables provide concrete evidence to share with upstream teams for root-cause analysis.
-```
-
 
 ## 🛠 Development Workflow: Preview Before DLT
 
