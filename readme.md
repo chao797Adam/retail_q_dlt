@@ -406,32 +406,6 @@ salesforce_oppo             ──►     silver.opportunity          ──┴�
 (generated)                 ──►     ─────────────────────────   ──►    gold.dim_calendar
 ```
 
-太好了，恭喜你准备给这个项目画上完美的句号！
-
-这句话最适合放在 **`## 🥇 Gold Layer: Star Schema`** 这一章的 **`### Pipeline Lineage`** 之后，也就是 **`### Semantic Layer: Metric View (Optional)`** 之前。
-
-因为这是对你 Gold 层数据准确性的最终验证，逻辑上属于“物理模型建好后，数据对账”的收尾环节。
-
-### 具体操作：
-在你的 README 里找到这一部分：
-
-```markdown
-### Pipeline Lineage
-
-The Gold layer completes the **Bronze → Silver → Gold** pipeline. The DLT pipeline graph should show the following dependencies:
-
-```text
-Bronze (Raw)                        Silver (Cleaned)                   Gold (Business-Ready)
-─────────────────                   ─────────────────                  ────────────────────────
-salesforce_acc              ──►     silver.account              ──►    gold.dim_customer
-product_catalog (PG)        ──►     silver.product_catalog      ──►    gold.dim_product
-                                    
-blob_transactions           ──►     silver.transactions         ──┐
-salesforce_oppo             ──►     silver.opportunity          ──┴─►  gold.fact_sales
-                                    
-(generated)                 ──►     ─────────────────────────   ──►    gold.dim_calendar
-```
-
 ### Data Reconciliation
 
 To validate the pipeline's end-to-end data integrity, raw CSV files were independently summed using Excel:
