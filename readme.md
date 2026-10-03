@@ -463,9 +463,16 @@ $$
    - **`name`** = Business-friendly alias (e.g., `"Payment Mode"`).
    - **`expr`** = Physical column or aggregation logic (e.g., `payment_mode` or `SUM(gross_amount)`).
    - **Benefit:** Decouples business terminology from physical schema, enabling schema evolution without breaking downstream BI reports.
-   - **Usage Note:** Querying a Metric View directly requires the `MEASURE()` function to explicitly invoke aggregation logic:
+   - **Usage Note:** Querying a Metric View requires explicit handling of dimensions and measures:
      ```sql
-     SELECT MEASURE(`Total Revenue`) FROM retail_q.retail_semantic.retail_metrics;
+     -- Dimensions can be selected directly
+     -- Measures must be wrapped in MEASURE() to trigger the aggregation
+     SELECT 
+         `Payment Mode`,
+         MEASURE(`Total Revenue`) AS total_revenue,
+         MEASURE(`Transaction Count`) AS transaction_count
+     FROM retail_q.retail_semantic.retail_metrics
+     GROUP BY ALL;
      ```
    - **Why:** Metric Views are designed for BI tools and AI assistants that handle this automatically. Manual SQL queries must use `MEASURE()` to trigger the aggregation.
 
