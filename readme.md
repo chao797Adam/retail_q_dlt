@@ -359,14 +359,89 @@ display(preview_df.limit(10))
 4. **Timestamp Parsing in DLT:**
    - Before applying `F.to_timestamp`, always preview the actual string format using a batch `spark.read` to avoid `NULL` propagation.
 
-## 📝 TODO & Architecture Decisions
 
-- [x] **Architecture Decision:** This project uses **DLT (Delta Live Tables)** instead of dbt for transformation and data quality enforcement.
-- [x] Implement Bronze ingestion using **Lakeflow Connect** for PostgreSQL and **Auto Loader** for Salesforce/Blob.
-- [x] Implement Silver layer DLT pipelines with data quality rules.
-- [ ] Implement **DLT `AUTO CDC`** for SCD Type 2 handling on `product_catalog`.
-- [ ] Build the Gold layer data models using DLT to generate `dim_products` and `fct_order_items`.
+## 🥇 Gold Layer: Star Schema (Delta Live Tables)
 
+The Gold layer is modeled as a **Star Schema**, providing business-ready data for BI tools and analytical queries. It consists of **one fact table** and **three dimension tables**.
+
+### Star Schema Design
+
+| Table | Type | Source (Silver Layer) | Description |
+| :--- | :--- | :--- | :--- |
+| `fact_sales` | Fact | `transactions` + `opportunity` | Transaction-level sales records with customer, product, and date keys. |
+| `dim_customer` | Dimension | `account` | Customer attributes (name, type, location, industry). |
+| `dim_product` | Dimension | `product_catalog` | Product attributes (name, category, brand, segment, price). |
+| `dim_calendar` | Dimension | Programmatically generated | Date attributes (year, quarter, month, week, day, is_weekend). |
+
+### Key Design Decisions
+
+1. **Surrogate Keys for Missing System IDs:**
+   - Since the Salesforce CSV export lacks the `Id` field, `account_name` is used as the `customer_id` (foreign key) in both `fact_sales` and `dim_customer`. This enables JOINs without a native system ID.
+
+2. **Generated Calendar Dimension:**
+   - `dim_calendar` is not ingested from any source system. It is generated programmatically using Spark SQL's `sequence()` function, covering the date range **2020-01-01 to 2030-12-31**.
+   - A `date_key` (integer in `yyyyMMdd` format) is derived for efficient JOINs with the fact table.
+
+3. **Materialized Views vs. Streaming Tables:**
+   - Gold layer objects are defined as `MATERIALIZED VIEW` (SQL) or `@dp.table` (Python), allowing DLT to manage refresh schedules automatically.
+
+### Example: Querying the Star Schema
+
+The following SQL demonstrates how the fact table JOINs with all three dimensions to produce a business-ready view:
+
+```sql
+SELECT 
+    f.transaction_id,
+    f.transaction_date,
+    c.customer_name,
+    c.billing_city,
+    p.product_name,
+    p.category,
+    cal.day_of_week_name,
+    f.quantity,
+    f.gross_amount
+FROM retail_q.gold.fact_sales f
+LEFT JOIN retail_q.gold.dim_customer c 
+    ON f.customer_id = c.customer_id
+LEFT JOIN retail_q.gold.dim_product p 
+    ON f.product_id = p.product_id
+LEFT JOIN retail_q.gold.dim_calendar cal 
+    ON f.transaction_date = cal.full_date;
+```
+
+### Pipeline Lineage
+
+The Gold layer completes the **Bronze → Silver → Gold** pipeline. The DLT pipeline graph should show the following dependencies:
+
+```text
+Bronze (Raw)                   Silver (Cleaned)                 Gold (Business-Ready)
+─────────────                  ─────────────────                ─────────────────────
+salesforce_acc          →      silver.account            →      gold.dim_customer
+product_catalog (PG)    →      silver.product_catalog    →      gold.dim_product
+blob_transactions       →      silver.transactions       ┐
+salesforce_oppo         →      silver.opportunity        ┴→     gold.fact_sales
+                                                          └→     gold.dim_calendar (generated)
+```
+
+## 🎯 Key Architecture Decisions
+
+This project is built on several intentional architectural choices. The following decisions are documented to explain **why** certain approaches were taken over alternatives.
+
+| Decision | Chosen Approach | Rationale |
+| :--- | :--- | :--- |
+| **Transformation Framework** | **DLT (Delta Live Tables)** over dbt | Built-in data quality expectations, streaming-native, and native `AUTO CDC` support without an external orchestration layer. |
+| **PostgreSQL Ingestion** | **Lakeflow Connect** | Native CDC with out-of-the-box SCD1/SCD2 support, eliminating manual MERGE logic. |
+| **Salesforce/Blob Ingestion** | **Auto Loader (CloudFiles)** | Maximum flexibility for CSV-based sources. Handles schema evolution and incremental loading with independent checkpoints. |
+| **SCD Type 2 Handling** | **Lakeflow Connect native CDC** (`__START_AT` / `__END_AT`) | No manual `AUTO CDC` needed — the connector already handles historical tracking. |
+| **Data Quality Strategy** | **Granular `@dp.expect` rules** over `@dp.expect_all_or_drop` | Per-rule audit metrics for precise root-cause analysis; avoids "black box" drops. |
+| **Missing Salesforce System IDs** | **Business name (`account_name`) as surrogate key** | Enables downstream JOINs despite the CSV export limitation. Documented as a known referential integrity trade-off. |
+| **Gold Layer Modeling** | **Star Schema** with generated calendar dimension | Industry-standard dimensional modeling for BI performance and usability. |
+
+**Key Takeaway:**
+- Every decision in this project was made with **observability**, **maintainability**, and **production-readiness** in mind.
+- Trade-offs (e.g., using `account_name` instead of `Id`) are explicitly documented rather than hidden.
+
+---
 
 ## 📚 Reference Architecture
 
