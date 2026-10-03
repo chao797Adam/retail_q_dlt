@@ -216,6 +216,20 @@ A key architectural difference between this project (using DLT) and a traditiona
 
 This project adopts the **DLT** approach to ensure the Silver layer is always clean and trustworthy from the moment data lands.
 
+### 📊 Data Quality in Action (Real Metrics)
+
+The following screenshot captures the actual data quality metrics from the Silver layer pipeline run:
+
+![DLT Data Quality Metrics](./assets/dlt_data_quality_metrics.png)
+
+**Observations from the pipeline run:**
+- **Written:** 95.8% (23 records) — Clean records successfully written to the Silver table.
+- **Dropped:** 4.2% (1 record) — A record with a missing `product_name` was dropped by `@dp.expect_or_drop`.
+- **`valid_price` (ALLOW):** 4.2% failure rate. A record with a negative `unit_price` was **allowed** to enter the table (but flagged), demonstrating the difference between `@dp.expect` (Warn/Allow) and `@dp.expect_or_drop` (Drop).
+- **`valid_product_name` (DROP):** 4.2% failure rate. A record with an empty `product_name` was **dropped**, ensuring downstream consumers never see nameless products.
+
+This real-world example proves the importance of **rule-level granularity**: if we had used a single `@dp.expect_all_or_drop` block, we would not be able to distinguish which specific rule triggered the drop. This confirms why granular `expect` rules are preferred in production-grade pipelines.
+
 ### Data Quality Strategy: Drop vs. Quarantine
 
 A critical design decision in the Silver layer is how to handle records that fail data quality expectations.
