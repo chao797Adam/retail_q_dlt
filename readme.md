@@ -436,6 +436,7 @@ This project is built on several intentional architectural choices. The followin
 | **Data Quality Strategy** | **Granular `@dp.expect` rules** over `@dp.expect_all_or_drop` | Per-rule audit metrics for precise root-cause analysis; avoids "black box" drops. |
 | **Missing Salesforce System IDs** | **Business name (`account_name`) as surrogate key** | The Salesforce CSV export lacks the `Id` field. `account_name` is used as a surrogate key to enable JOINs between `account` and `opportunity`. |
 | **Gold Layer Modeling** | **Star Schema** with generated calendar dimension | Industry-standard dimensional modeling for BI performance and usability. |
+| **Semantic Layer / Metric View** | **Not implemented; concept documented** | The reference architecture defines a Metric View (`retail_metrics`) with 6 measures (Transaction Count, Total Revenue, etc.) and 15 dimensions for BI consumption. This project does not implement it because there is no downstream BI team. However, the Star Schema is fully compatible with a future Metric View layer. |
 
 **Key Takeaway:**
 - Every decision in this project was made with **observability**, **maintainability**, and **production-readiness** in mind.
