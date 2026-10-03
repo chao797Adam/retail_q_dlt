@@ -38,6 +38,44 @@ The reference implementation relies solely on **Lakeflow Connect** for Salesforc
 - **Lakeflow Connect** is ideal for production-grade, low-maintenance pipelines where CDC and SCD are required out-of-the-box.
 - **Auto Loader** provides maximum flexibility and control but requires manual schema management, data mocking, and downstream SCD implementation (planned via DLT `AUTO CDC`).
 
+#### ⚠️ Critical Difference: Missing Primary Key (`Id`)
+
+The most significant divergence between this project and the reference architecture is the **absence of the Salesforce system `Id` field**.
+
+**Reference Architecture (Salesforce API / Lakeflow Connect):**
+```python
+# account.py (Author's version)
+F.col("Id").alias("id"),                            # System Primary Key
+F.col("MasterRecordId").alias("master_record_id"),  # System merge history
+
+# opportunity.py (Author's version)
+F.col("Id").alias("id"),                            # System Primary Key
+F.col("AccountId").alias("account_id"),             # System Foreign Key linking to account
+```
+
+**This Project (CSV Export / Auto Loader):**
+```python
+# account.py (This project)
+F.col("account_name").alias("account_name"),        # Business name used as primary key
+
+# opportunity.py (This project)
+F.col("opportunity_name").alias("opportunity_name"),
+F.col("account_name").alias("account_name"),        # Manually mocked to enable JOINs
+```
+
+| Aspect | Reference Architecture | This Project |
+| :--- | :--- | :--- |
+| **Primary Key (`account`)** | `Id` (Salesforce System ID) | `account_name` (Business Name) |
+| **Foreign Key (`opportunity`)** | `AccountId` (Salesforce System ID) | `account_name` (Mocked Business Name) |
+| **Join Logic** | `acc.id = oppo.account_id` | `acc.account_name = oppo.account_name` |
+| **Data Integrity** | **High** — System IDs are unique and immutable. | **Low** — Business names can be duplicated or changed. |
+| **Root Cause** | Ingestion via **Lakeflow Connect** (API) preserves system fields. | Ingestion via **Auto Loader** (CSV export) omits system fields. |
+
+**Why This Matters:**
+- **Referential Integrity Risk:** Joining on `account_name` is functionally correct for this test dataset, but it is **not production-ready**. In real-world scenarios, two different accounts could share the same name (e.g., "Acme Corp"), leading to incorrect JOIN results (data fan-out).
+- **The "Mocking" Workaround:** To enable downstream JOINs, this project manually injected `account_name` into the `opportunity` table via PySpark code. This simulates the Salesforce UI behavior but does not replace the need for a true system ID.
+- **Future Improvement:** To achieve production-grade referential integrity, the ingestion pipeline should be migrated to **Lakeflow Connect** or the CSV export should be configured to include the `AccountId` field.
+
 ## 📁 Project Structure
 
 ### Storage Structure (Bronze Layer)
