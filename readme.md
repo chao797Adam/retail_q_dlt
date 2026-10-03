@@ -341,25 +341,6 @@ preview_df = source_df.select(
 # 3. Display the result to verify the output
 display(preview_df.limit(10))
 ```
-
-## ⚠️ Lessons Learned
-
-1. **Delta Lake Column Name Restrictions:**
-   - `Delta Lake` by default rejects column names containing spaces, `/`, or other illegal characters.
-   - **Solution:** Immediately clean and rename columns after reading the stream in Auto Loader.
-
-2. **Auto Loader vs. SCD:**
-   - Auto Loader only performs **"faithful ingestion"**; it allows duplicate IDs to enter the Bronze layer by default.
-   - **SCD logic is not handled here.** It should be processed in the Silver layer using **DLT's `AUTO CDC`** or `MERGE INTO`.
-
-3. **Volume File Movement:**
-   - Moving files in Unity Catalog Volumes is strict; `mv` often fails due to hidden placeholder files.
-   - **Solution:** Use `dbutils.fs.mv` or a combination of `cp -r` and `rm -rf`.
-
-4. **Timestamp Parsing in DLT:**
-   - Before applying `F.to_timestamp`, always preview the actual string format using a batch `spark.read` to avoid `NULL` propagation.
-
-
 ## 🥇 Gold Layer: Star Schema (Delta Live Tables)
 
 The Gold layer is modeled as a **Star Schema**, providing business-ready data for BI tools and analytical queries. It consists of **one fact table** and **three dimension tables**.
@@ -424,6 +405,68 @@ salesforce_oppo             ──►     silver.opportunity          ──┴�
                                     
 (generated)                 ──►     ─────────────────────────   ──►    gold.dim_calendar
 ```
+
+### Semantic Layer: Metric View (Optional)
+
+To demonstrate how the Gold layer can be extended into a governed semantic layer, a minimal **Metric View** is defined on top of `fact_sales`.
+
+```sql
+%sql
+CREATE VIEW retail_q.retail_semantic.retail_metrics
+WITH METRICS
+LANGUAGE YAML
+AS $$
+version: 1.1
+source: retail_q.gold.fact_sales
+comment: Retail metrics for analyzing sales transactions
+dimensions:
+  - name: Payment Mode
+    expr: payment_mode
+  - name: Sales Channel
+    expr: sales_channel
+  - name: Deal Size
+    expr: deal_size
+  - name: Stage
+    expr: stage
+measures:
+  - name: Total Revenue
+    expr: SUM(gross_amount)
+  - name: Transaction Count
+    expr: COUNT(1)
+  - name: Total Quantity Sold
+    expr: SUM(quantity)
+  - name: Average Deal Amount
+    expr: AVG(amount)
+$$
+```
+
+**Note:** This Metric View is a minimal working example. It defines 4 dimensions and 4 measures directly on `fact_sales`, without the enterprise-grade formatting (synonyms, currency format, etc.) shown in the reference architecture. It exists to demonstrate the concept of a semantic layer, not to replace a full BI governance implementation.
+
+## ⚠️ Lessons Learned
+
+1. **Delta Lake Column Name Restrictions:**
+   - `Delta Lake` by default rejects column names containing spaces, `/`, or other illegal characters.
+   - **Solution:** Immediately clean and rename columns after reading the stream in Auto Loader.
+
+2. **Auto Loader vs. SCD:**
+   - Auto Loader only performs **"faithful ingestion"**; it allows duplicate IDs to enter the Bronze layer by default.
+   - **SCD logic is not handled here.** It should be processed in the Silver layer using **DLT's `AUTO CDC`** or `MERGE INTO`.
+
+3. **Volume File Movement:**
+   - Moving files in Unity Catalog Volumes is strict; `mv` often fails due to hidden placeholder files.
+   - **Solution:** Use `dbutils.fs.mv` or a combination of `cp -r` and `rm -rf`.
+
+4. **Timestamp Parsing in DLT:**
+   - Before applying `F.to_timestamp`, always preview the actual string format using a batch `spark.read` to avoid `NULL` propagation.
+
+5. **Metric View Concepts & `MEASURE()` Function:**
+   - **`name`** = Business-friendly alias (e.g., `"Payment Mode"`).
+   - **`expr`** = Physical column or aggregation logic (e.g., `payment_mode` or `SUM(gross_amount)`).
+   - **Benefit:** Decouples business terminology from physical schema, enabling schema evolution without breaking downstream BI reports.
+   - **Usage Note:** Querying a Metric View directly requires the `MEASURE()` function to explicitly invoke aggregation logic:
+     ```sql
+     SELECT MEASURE(`Total Revenue`) FROM retail_q.retail_semantic.retail_metrics;
+
 
 ## 🎯 Key Architecture Decisions
 
