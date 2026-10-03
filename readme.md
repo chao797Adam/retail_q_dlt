@@ -431,15 +431,16 @@ This project is built on several intentional architectural choices. The followin
 | :--- | :--- | :--- |
 | **Transformation Framework** | **DLT (Delta Live Tables)** over dbt | Built-in data quality expectations, streaming-native, and native `AUTO CDC` support without an external orchestration layer. |
 | **PostgreSQL Ingestion** | **Lakeflow Connect** | Native CDC with out-of-the-box SCD1/SCD2 support, eliminating manual MERGE logic. |
-| **Salesforce/Blob Ingestion** | **Auto Loader (CloudFiles)** | Maximum flexibility for CSV-based sources. Handles schema evolution and incremental loading with independent checkpoints. |
-| **SCD Type 2 Handling** | **Lakeflow Connect native CDC** (`__START_AT` / `__END_AT`) | No manual `AUTO CDC` needed — the connector already handles historical tracking. |
+| **Salesforce/Blob Ingestion** | **Auto Loader (CloudFiles) with CSV export** | Manually exported CSV files were used instead of a managed connector. Auto Loader handles schema evolution and incremental loading with independent checkpoints. |
+| **SCD Type 2 Handling** | **Lakeflow Connect native CDC** (`__START_AT` / `__END_AT`) for PostgreSQL; **Flat / Append-only** for Salesforce | Salesforce CSV exports do not contain CDC metadata. SCD2 is only supported natively for PostgreSQL via Lakeflow Connect. |
 | **Data Quality Strategy** | **Granular `@dp.expect` rules** over `@dp.expect_all_or_drop` | Per-rule audit metrics for precise root-cause analysis; avoids "black box" drops. |
-| **Missing Salesforce System IDs** | **Business name (`account_name`) as surrogate key** | Enables downstream JOINs despite the CSV export limitation. Documented as a known referential integrity trade-off. |
+| **Missing Salesforce System IDs** | **Business name (`account_name`) as surrogate key** | The Salesforce CSV export lacks the `Id` field. `account_name` is used as a surrogate key to enable JOINs between `account` and `opportunity`. |
 | **Gold Layer Modeling** | **Star Schema** with generated calendar dimension | Industry-standard dimensional modeling for BI performance and usability. |
 
 **Key Takeaway:**
 - Every decision in this project was made with **observability**, **maintainability**, and **production-readiness** in mind.
 - Trade-offs (e.g., using `account_name` instead of `Id`) are explicitly documented rather than hidden.
+- **Note:** The reference architecture (see below) uses Lakeflow Connect for Salesforce, which provides native SCD2 and system fields. This project intentionally uses Auto Loader with CSV export to demonstrate manual ingestion handling.
 
 ---
 
