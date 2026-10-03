@@ -10,7 +10,7 @@ The project is built on Databricks + Unity Catalog, designed with a layered arch
 - **Source:** Data from business systems like PostgreSQL (Neon) and Salesforce.
 - **Bronze (Raw):** Stores unmodified source data in Delta Lake format.
 - **Silver (Cleaned):** Cleanses, normalizes, and enforces data quality rules on Bronze data using DLT.
-- **Gold (Marts):** Business-level aggregated wide tables (Planned).
+- **Gold (Marts):** Business-level aggregated wide tables modeled as a Star Schema.
 
 ## 🔄 Hybrid Ingestion Strategy
 
@@ -467,6 +467,7 @@ $$
      ```sql
      SELECT MEASURE(`Total Revenue`) FROM retail_q.retail_semantic.retail_metrics;
      ```
+   - **Why:** Metric Views are designed for BI tools and AI assistants that handle this automatically. Manual SQL queries must use `MEASURE()` to trigger the aggregation.
 
 ## 🎯 Key Architecture Decisions
 
