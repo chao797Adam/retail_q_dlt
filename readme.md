@@ -421,7 +421,9 @@ SELECT SUM(gross_amount) FROM retail_q.gold.fact_sales;
 -- Result: 194,093,860
 ```
 
-**Conclusion:** The pipeline accurately ingests, transforms, and aggregates every row of source data without loss or duplication, confirming end-to-end data integrity.
+As a second, independent check — not relying on Excel's own arithmetic — the same two raw CSVs were also summed with a standalone script computing `quantity * selling_price` row by row. This produced the identical result (`175,905,308` + `18,188,552` = `194,093,860`), confirming the Excel total wasn't an artifact of a spreadsheet formula error.
+
+**Conclusion:** Three independently computed totals — Excel, a standalone script, and the Gold-layer pipeline output — all agree exactly. This rules out not just a SQL syntax error, but a systematic miscalculation anywhere in the Bronze→Silver→Gold chain that would otherwise produce a self-consistent but wrong number with no error raised.
 
 ### Semantic Layer: Metric View (Optional)
 
