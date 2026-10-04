@@ -460,29 +460,68 @@ LANGUAGE YAML
 AS $$
 version: 1.1
 source: retail_q.gold.fact_sales
-comment: Retail metrics for analyzing sales transactions
+comment: Retail metrics for analyzing sales transactions, revenue, and product performance
+
+joins:
+  - name: product
+    source: retail_q.gold.dim_product
+    on: source.product_id = product.product_id
+  - name: customer
+    source: retail_q.gold.dim_customer
+    on: source.customer_id = customer.customer_id
+  - name: calendar
+    source: retail_q.gold.dim_calendar
+    on: source.transaction_date = calendar.full_date
+
 dimensions:
+  - name: Transaction Date
+    expr: calendar.full_date
+  - name: Year
+    expr: calendar.year
+  - name: Quarter
+    expr: calendar.quarter
+  - name: Month Name
+    expr: calendar.month_name
+  - name: Product Category
+    expr: product.category
+  - name: Product Brand
+    expr: product.brand
   - name: Payment Mode
-    expr: payment_mode
+    expr: source.payment_mode
   - name: Sales Channel
-    expr: sales_channel
-  - name: Deal Size
-    expr: deal_size
+    expr: source.sales_channel
   - name: Stage
-    expr: stage
+    expr: source.stage
+  - name: Customer Type
+    expr: customer.customer_type
+  - name: Customer Name
+    expr: customer.customer_name
+  - name: Billing City
+    expr: customer.billing_city
+  - name: Billing State
+    expr: customer.billing_state
+  - name: Billing Country
+    expr: customer.billing_country
+  - name: Industry
+    expr: customer.industry
+
 measures:
-  - name: Total Revenue
-    expr: SUM(gross_amount)
   - name: Transaction Count
     expr: COUNT(1)
+  - name: Total Revenue
+    expr: SUM(source.gross_amount)
   - name: Total Quantity Sold
-    expr: SUM(quantity)
-  - name: Average Deal Amount
-    expr: AVG(amount)
+    expr: SUM(source.quantity)
+  - name: Total Discount
+    expr: SUM(source.discount_amount)
+  - name: Average Transaction Value
+    expr: SUM(source.gross_amount) / COUNT(1)
+  - name: Unique Customers
+    expr: COUNT(DISTINCT customer.customer_id)
 $$
 ```
 
-**Note:** This Metric View is a minimal working example. It defines 4 dimensions and 4 measures directly on `fact_sales`, without the enterprise-grade formatting (synonyms, currency format, etc.) shown in the reference architecture. It exists to demonstrate the concept of a semantic layer, not to replace a full BI governance implementation.
+**Note:** This Metric View defines 15 dimensions and 6 measures, with 3 JOINs to `dim_product`, `dim_customer`, and `dim_calendar`. It enables cross-table BI slicing (by product category, customer city, time period) and is compatible with AI-generated dashboards in Databricks.
 
 ## ⚠️ Lessons Learned
 
