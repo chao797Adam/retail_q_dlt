@@ -407,7 +407,6 @@ Q1: Does the source provide a reliable sequence column?
 | **Append-only + Known Limitation** | `account`, `opportunity` | Source CSV has no sequence column; documented as limitation |
 | **No dedup needed** | `transactions` | `transaction_id` is naturally unique (fact table) |
 
----
 
 ## 🥇 Gold Layer: Star Schema (Delta Live Tables)
 
