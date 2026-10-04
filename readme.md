@@ -341,6 +341,23 @@ preview_df = source_df.select(
 # 3. Display the result to verify the output
 display(preview_df.limit(10))
 ```
+
+### ⚠️ Known Limitation: No Native CDC for Salesforce Tables
+
+**Context:** Unlike `product_catalog` and `inventory` (which come from PostgreSQL via Lakeflow Connect and natively support SCD1/SCD2), the two Salesforce tables (`account` and `opportunity`) are ingested via Auto Loader from manually exported CSV files.
+
+**Problem:**
+- `account` and `opportunity` source data contain **no timestamp field of any kind** — not a business `updated_at`, not even a file-level ingestion marker in the original CSV.
+- Without a reliable sequence column, true SCD1/SCD2 deduplication is impossible.
+
+**Current Behavior:**
+- `silver.account` and `silver.opportunity` are **Append-only**. If the same business key appears multiple times in the source, all versions will coexist in the Silver table.
+- Downstream Gold layer JOINs are joined on `account_name`, which is safe for this dataset (no duplicates) but would require deduplication logic in a production scenario.
+
+**Future Improvement:**
+- To achieve true CDC for these two tables, the source system (Salesforce) would need to provide `Id` and `LastModifiedDate`.
+- Alternatively, an `ingested_at` column could be added at Bronze write time (via Auto Loader) and used as `sequence_by` for DLT's `create_auto_cdc_flow` with `stored_as_scd_type=1`. However, this only provides "last write wins" semantics and cannot distinguish a genuine source-side update from Bronze re-ingesting an unchanged row.
+
 ## 🥇 Gold Layer: Star Schema (Delta Live Tables)
 
 The Gold layer is modeled as a **Star Schema**, providing business-ready data for BI tools and analytical queries. It consists of **one fact table** and **three dimension tables**.
