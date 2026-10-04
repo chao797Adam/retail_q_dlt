@@ -632,4 +632,5 @@ This project is built on several intentional architectural choices. The followin
 
 The reference implementation for this project is based on the following tutorial:
 
+- **AUTO CDC APIs:** [The AUTO CDC APIs: Simplify change data capture with pipelines](https://docs.databricks.com/aws/en/ldp/cdc)
 - **YouTube:** [Retail Data Engineering Project in Databricks](https://www.youtube.com/watch?v=QHwszePV3GY&list=PLShYG8gCK1IU&index=2&t=4629s)
