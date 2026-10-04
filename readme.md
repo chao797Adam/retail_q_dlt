@@ -364,6 +364,51 @@ display(preview_df.limit(10))
 - To achieve true CDC for these two tables, the source system (Salesforce) would need to provide `Id` and `LastModifiedDate`.
 - Alternatively, an `ingested_at` column could be added at Bronze write time (via Auto Loader) and used as `sequence_by` for DLT's `create_auto_cdc_flow` with `stored_as_scd_type=1`. However, this only provides "last write wins" semantics and cannot distinguish a genuine source-side update from Bronze re-ingesting an unchanged row.
 
+### 🧭 Decision Tree: When to Add Deduplication / CDC
+
+Based on the limitation above, the following decision tree summarizes **when** and **how** to implement deduplication for a new data source:
+
+```text
+Problem: "The source data may contain duplicates or updates."
+
+Q1: Does the source provide a reliable sequence column?
+    (e.g., updated_at, LastModifiedDate, version, monotonic ID)
+    │
+    ├── YES ──► Use DLT `create_auto_cdc_flow` with `sequence_by = that column`
+    │           │
+    │           ├── Keep only latest  ──► stored_as_scd_type = 1
+    │           └── Keep full history ──► stored_as_scd_type = 2
+    │
+    └── NO ──► Q2: Can we add a sequence column at ingestion time?
+               │
+               ├── YES (e.g., Auto Loader `ingested_at`) ──► Add the column,
+               │                                             then use CDC
+               │                                             (note: only "last
+               │                                             write wins", not
+               │                                             true source-side CDC)
+               │
+               └── NO ──► Q3: Is deduplication actually required?
+                          │
+                          ├── YES ──► Document as **Known Limitation** and
+                          │           define the future upgrade path
+                          │           (this project's approach)
+                          │
+                          └── NO ──► Accept Append-only; deduplicate
+                                     downstream with
+                                     `ROW_NUMBER() OVER (PARTITION BY key
+                                     ORDER BY <col>) = 1`
+```
+
+**Summary of the three SCD strategies used in this project:**
+
+| Strategy | Where Used | Why |
+| :--- | :--- | :--- |
+| **Native CDC (SCD1/SCD2)** | `product_catalog`, `inventory` | Source provides CDC metadata via Lakeflow Connect |
+| **Append-only + Known Limitation** | `account`, `opportunity` | Source CSV has no sequence column; documented as limitation |
+| **No dedup needed** | `transactions` | `transaction_id` is naturally unique (fact table) |
+
+---
+
 ## 🥇 Gold Layer: Star Schema (Delta Live Tables)
 
 The Gold layer is modeled as a **Star Schema**, providing business-ready data for BI tools and analytical queries. It consists of **one fact table** and **three dimension tables**.
