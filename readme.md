@@ -160,14 +160,17 @@ Since the source Opportunity CSV lacks relational keys, we simulate the Salesfor
 from pyspark.sql.functions import col, when, monotonically_increasing_id, row_number
 from pyspark.sql.window import Window
 
-# 1. Read the existing Bronze table
-df_oppo = spark.read.table("retail_q.bronze.salesforce_oppo")
+# 1. Read and cache the Bronze table to avoid read-while-overwrite conflicts
+df_oppo = spark.read.table("retail_q.bronze.salesforce_oppo").cache()
 
-# 2. Generate row numbers to mimic Salesforce UI selection
+# 2. Force single partition for deterministic row ordering
+df_oppo = df_oppo.repartition(1)
+
+# 3. Generate stable row numbers
 windowSpec = Window.orderBy(monotonically_increasing_id())
 df_with_row = df_oppo.withColumn("row_num", row_number().over(windowSpec))
 
-# 3. Assign account_name based on specific row ranges (mocking the UI batch update)
+# 4. Assign account_name based on specific row ranges (mocking the UI batch update)
 df_oppo_mocked = df_with_row.withColumn(
     "account_name",
     when((col("row_num") >= 3) & (col("row_num") <= 7), "Fresh Stores Pvt Ltd 4")   
@@ -175,13 +178,16 @@ df_oppo_mocked = df_with_row.withColumn(
     .otherwise("Elite Wholesale Pvt Ltd 19")  
 ).drop("row_num")
 
-# 4. Overwrite the Bronze table with the new mocked column
+# 5. Overwrite the Bronze table with the new mocked column
 # Note: mergeSchema is enabled to allow adding new columns to the existing Delta table
 (df_oppo_mocked.write
  .mode("overwrite")
  .option("mergeSchema", "true") 
  .saveAsTable("retail_q.bronze.salesforce_oppo")
 )
+
+# 6. Release the cache
+df_oppo.unpersist()
 ```
 
 ## 🥈 Silver Layer: Transformation (Delta Live Tables)
@@ -511,6 +517,11 @@ $$
      GROUP BY ALL;
      ```
    - **Why:** Metric Views are designed for BI tools and AI assistants that handle this automatically. Manual SQL queries must use `MEASURE()` to trigger the aggregation.
+
+6. **Deterministic Mocking with Row Numbers:**
+   - `monotonically_increasing_id()` does not guarantee a stable order across partitions. Combined with `ROW_NUMBER()`, this can make "mock by row range" results non-reproducible across runs.
+   - Additionally, reading a table and overwriting it in the same flow risks evaluation-timing conflicts (lazy evaluation may trigger the read after the write has begun).
+   - **Solution:** Add `.repartition(1)` before the window function for deterministic ordering, and `.cache()` immediately after the read to materialize the source data before overwrite.
 
 ## 🎯 Key Architecture Decisions
 
